@@ -1,7 +1,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -39,6 +39,9 @@ def generate_launch_description():
         arguments=[
             '-configuration_directory', config_dir,
             '-configuration_basename', 'cartographer_sim.lua'
+        ],
+        remappings=[
+            ('scan', '/scan')
         ]
     )
     
@@ -55,6 +58,9 @@ def generate_launch_description():
         arguments=[
             '-configuration_directory', config_dir,
             '-configuration_basename', 'cartographer_real.lua'
+        ],
+        remappings=[
+            ('scan', '/scan')
         ]
     )
     
@@ -88,6 +94,7 @@ def generate_launch_description():
         ]
     )
     
+    # Adding a slight delay before starting RViz to ensure map frames are published
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -97,6 +104,11 @@ def generate_launch_description():
         output='screen'
     )
     
+    delayed_rviz = TimerAction(
+        period=2.0,
+        actions=[rviz_node]
+    )
+    
     # Create and return launch description
     return LaunchDescription([
         use_sim_time_arg,
@@ -104,5 +116,5 @@ def generate_launch_description():
         cartographer_node_real,
         occupancy_grid_node_sim,
         occupancy_grid_node_real,
-        rviz_node
+        delayed_rviz
     ])
