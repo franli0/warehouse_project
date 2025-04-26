@@ -14,7 +14,7 @@
   <depend>nav2_bt_navigator</depend>
   <depend>nav2_planner</depend>
   <depend>nav2_controller</depend>
-  <depend>nav2_recoveries</depend>
+  <depend>nav2_behaviors</depend>
   <depend>nav2_lifecycle_manager</depend>
   <depend>nav_msgs</depend>
   <depend>rviz2</depend>
