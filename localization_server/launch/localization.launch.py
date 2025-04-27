@@ -39,8 +39,9 @@ def generate_launch_description():
     amcl_config_sim = os.path.join(config_dir, 'amcl_config_sim.yaml')
     amcl_config_real = os.path.join(config_dir, 'amcl_config_real.yaml')
     
-    # Map Server Node
-    map_server_node = Node(
+    # Map Server Node - For Simulation
+    map_server_node_sim = Node(
+        condition=IfCondition(use_sim_time),
         package='nav2_map_server',
         executable='map_server',
         name='map_server',
@@ -49,6 +50,21 @@ def generate_launch_description():
             {'yaml_filename': [map_config_dir, '/', map_file]},
             {'topic_name': 'map'},
             {'frame_id': 'map'},
+            {'use_sim_time': use_sim_time}
+        ]
+    )
+
+    # Map Server Node - For Real Robot
+    map_server_node_real = Node(
+        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
+        package='nav2_map_server',
+        executable='map_server',
+        name='map_server',
+        output='screen',
+        parameters=[
+            {'yaml_filename': [map_config_dir, '/', map_file]},
+            {'topic_name': 'map'},
+            {'frame_id': 'robot_map'},
             {'use_sim_time': use_sim_time}
         ]
     )
@@ -100,7 +116,8 @@ def generate_launch_description():
     return LaunchDescription([
         map_file_arg,
         use_sim_time_arg,
-        map_server_node,
+        map_server_node_sim,
+        map_server_node_real,
         amcl_node_sim,
         amcl_node_real,
         lifecycle_manager_node,
