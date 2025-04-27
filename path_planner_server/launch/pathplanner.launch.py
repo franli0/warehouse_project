@@ -49,7 +49,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             bt_nav_sim_config,
-            {'default_bt_xml_filename': bt_xml_path},
+            {'default_nav_to_pose_bt_xml': bt_xml_path},
             {'use_sim_time': use_sim_time}
         ]
     )
@@ -130,7 +130,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             bt_nav_real_config,
-            {'default_bt_xml_filename': bt_xml_path},
+            {'default_nav_to_pose_bt_xml': bt_xml_path},
             {'use_sim_time': use_sim_time}
         ]
     )
