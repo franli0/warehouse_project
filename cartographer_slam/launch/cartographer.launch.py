@@ -23,7 +23,8 @@ def generate_launch_description():
     config_dir = os.path.join(pkg_dir, 'config')
     
     # RViz configuration
-    rviz_config = os.path.join(pkg_dir, 'rviz', 'mapping.rviz')
+    rviz_config_sim = os.path.join(pkg_dir, 'rviz', 'mapping_sim.rviz')
+    rviz_config_real = os.path.join(pkg_dir, 'rviz', 'mapping_real.rviz')
     
     # Determine which configuration file to use based on use_sim_time
     # For simulation environment
@@ -93,20 +94,35 @@ def generate_launch_description():
             '-resolution', '0.05'
         ]
     )
-    
-    # Adding a slight delay before starting RViz to ensure map frames are published
-    rviz_node = Node(
+
+    # RViz node with different fixed frame based on environment
+    rviz_node_sim = Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config],
+        arguments=['-d', rviz_config_sim],
         parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
     )
-    
-    delayed_rviz = TimerAction(
+
+    rviz_node_real = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config_real],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen'
+    )
+
+    # Add a delay to ensure the map server is fully active before RViz starts
+    delayed_rviz_sim = TimerAction(
         period=2.0,
-        actions=[rviz_node]
+        actions=[rviz_node_sim]
+    )
+    
+    delayed_rviz_real = TimerAction(
+        period=2.0,
+        actions=[rviz_node_real]
     )
     
     # Create and return launch description
@@ -116,5 +132,6 @@ def generate_launch_description():
         cartographer_node_real,
         occupancy_grid_node_sim,
         occupancy_grid_node_real,
-        delayed_rviz
+        delayed_rviz_sim,
+        delayed_rviz_real
     ])
