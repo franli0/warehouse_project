@@ -1,4 +1,5 @@
 import os
+import tempfile
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -34,6 +35,21 @@ def generate_launch_description():
     
     # RViz configuration
     rviz_config = os.path.join(pkg_dir, 'rviz', 'localization.rviz')
+
+    with open(rviz_config, 'r') as f:
+        template_content = f.read()
+
+    # Create simulation config
+    sim_rviz_content = template_content.replace('{fixed_frame}', 'map')
+    sim_rviz_path = os.path.join(tempfile.gettempdir(), 'localization_sim.rviz')
+    with open(sim_rviz_path, 'w') as f:
+        f.write(sim_rviz_content)
+    
+    # Create real robot config
+    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map')
+    real_rviz_path = os.path.join(tempfile.gettempdir(), 'localization_real.rviz')
+    with open(real_rviz_path, 'w') as f:
+        f.write(real_rviz_content)
     
     # Load AMCL configuration files
     amcl_config_sim = os.path.join(config_dir, 'amcl_config_sim.yaml')
@@ -102,12 +118,23 @@ def generate_launch_description():
         ]
     )
     
-    # RViz
-    rviz_node = Node(
+    # RViz node with different fixed frame based on environment
+    rviz_node_sim = Node(
+        condition=IfCondition(use_sim_time),
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config],
+        arguments=['-d', sim_rviz_path],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen'
+    )
+    
+    rviz_node_real = Node(
+        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', real_rviz_path],
         parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
     )
@@ -121,5 +148,6 @@ def generate_launch_description():
         amcl_node_sim,
         amcl_node_real,
         lifecycle_manager_node,
-        rviz_node
+        rviz_node_sim,
+        rviz_node_real
     ])
