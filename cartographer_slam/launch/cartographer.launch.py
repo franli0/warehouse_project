@@ -1,4 +1,5 @@
 import os
+import tempfile
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction
@@ -24,6 +25,21 @@ def generate_launch_description():
     
     # RViz configuration
     rviz_config = os.path.join(pkg_dir, 'rviz', 'mapping.rviz')
+    
+    with open(rviz_config, 'r') as f:
+        template_content = f.read()
+    
+    # Create simulation config
+    sim_rviz_content = template_content.replace('{fixed_frame}', 'map')
+    sim_rviz_path = os.path.join(tempfile.gettempdir(), 'mapping_sim.rviz')
+    with open(sim_rviz_path, 'w') as f:
+        f.write(sim_rviz_content)
+    
+    # Create real robot config
+    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map')
+    real_rviz_path = os.path.join(tempfile.gettempdir(), 'mapping_real.rviz')
+    with open(real_rviz_path, 'w') as f:
+        f.write(real_rviz_content)
     
     # Determine which configuration file to use based on use_sim_time
     # For simulation environment
@@ -95,22 +111,38 @@ def generate_launch_description():
     )
 
     # RViz node with different fixed frame based on environment
-    rviz_node = Node(
+    rviz_node_sim = Node(
+        condition=IfCondition(use_sim_time),
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config],
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            {'fixed_frame': PythonExpression(['"map" if ', use_sim_time, ' else "robot_map"'])}
-        ],
+        arguments=['-d', sim_rviz_path],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen'
+    )
+    
+    rviz_node_real = Node(
+        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', real_rviz_path],
+        parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
     )
 
+
     # Add a delay to ensure the map server is fully active before RViz starts
-    delayed_rviz = TimerAction(
+    delayed_rviz_sim = TimerAction(
         period=2.0,
-        actions=[rviz_node]
+        actions=[rviz_node_sim],
+        condition=IfCondition(use_sim_time)
+    )
+    
+    delayed_rviz_real = TimerAction(
+        period=2.0,
+        actions=[rviz_node_real],
+        condition=IfCondition(PythonExpression(['not ', use_sim_time]))
     )
     
     # Create and return launch description
@@ -120,5 +152,6 @@ def generate_launch_description():
         cartographer_node_real,
         occupancy_grid_node_sim,
         occupancy_grid_node_real,
-        delayed_rviz
+        delayed_rviz_sim,
+        delayed_rviz_real
     ])
