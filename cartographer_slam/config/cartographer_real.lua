@@ -4,10 +4,10 @@ include "trajectory_builder.lua"
 options = {
   map_builder = MAP_BUILDER,
   trajectory_builder = TRAJECTORY_BUILDER,
-  map_frame = "map",
+  map_frame = "robot_map",
   tracking_frame = "robot_base_footprint",
-  published_frame = "odom",
-  odom_frame = "odom",
+  published_frame = "robot_odom",
+  odom_frame = "robot_odom",
   provide_odom_frame = true,
   publish_frame_projected_to_2d = true,
   use_odometry = true,
