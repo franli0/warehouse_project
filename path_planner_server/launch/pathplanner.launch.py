@@ -1,7 +1,8 @@
 import os
+import tempfile
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -24,6 +25,21 @@ def generate_launch_description():
     
     # RViz configuration
     rviz_config = os.path.join(pkg_dir, 'rviz', 'pathplanning.rviz')
+
+    with open(rviz_config, 'r') as f:
+        template_content = f.read()
+
+    # Create simulation config
+    sim_rviz_content = template_content.replace('{fixed_frame}', 'map')
+    sim_rviz_path = os.path.join(tempfile.gettempdir(), 'pathplanning_sim.rviz')
+    with open(sim_rviz_path, 'w') as f:
+        f.write(sim_rviz_content)
+    
+    # Create real robot config
+    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map')
+    real_rviz_path = os.path.join(tempfile.gettempdir(), 'pathplanning_real.rviz')
+    with open(real_rviz_path, 'w') as f:
+        f.write(real_rviz_content)
     
     # Behavior Tree configuration
     bt_xml_path = os.path.join(config_dir, 'navigate_w_replanning_and_recovery.xml')
@@ -116,7 +132,7 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config],
+        arguments=['-d', sim_rviz_path],
         parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
     )
@@ -197,9 +213,22 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config],
+        arguments=['-d', real_rviz_path],
         parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
+    )
+
+    # Add a delay to ensure the map server is fully active before RViz starts
+    delayed_rviz_sim = TimerAction(
+        period=2.0,
+        actions=[rviz_node_sim],
+        condition=IfCondition(use_sim_time)
+    )
+    
+    delayed_rviz_real = TimerAction(
+        period=2.0,
+        actions=[rviz_node_real],
+        condition=IfCondition(PythonExpression(['not ', use_sim_time]))
     )
     
     # Create and return launch description
@@ -212,7 +241,7 @@ def generate_launch_description():
         controller_server_node_sim,
         recoveries_server_node_sim,
         lifecycle_manager_node_sim,
-        rviz_node_sim,
+        delayed_rviz_sim,
         
         # Real robot nodes
         bt_navigator_node_real,
@@ -220,5 +249,5 @@ def generate_launch_description():
         controller_server_node_real,
         recoveries_server_node_real,
         lifecycle_manager_node_real,
-        rviz_node_real
+        delayed_rviz_real
     ])
