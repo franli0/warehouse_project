@@ -2,10 +2,11 @@ import os
 import tempfile
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -32,6 +33,10 @@ def generate_launch_description():
     map_server_config_dir = get_package_share_directory('map_server')
     map_config_dir = os.path.join(map_server_config_dir, 'config')
     config_dir = os.path.join(pkg_dir, 'config')
+
+    map_yaml_file = PathJoinSubstitution(
+        [FindPackageShare('map_server'), 'config', map_file]
+    )
     
     # RViz configuration
     rviz_config = os.path.join(pkg_dir, 'rviz', 'localization.rviz')
@@ -63,7 +68,7 @@ def generate_launch_description():
         name='map_server',
         output='screen',
         parameters=[
-            {'yaml_filename': [map_config_dir, '/', map_file]},
+            {'yaml_filename': map_yaml_file},
             {'topic_name': 'map'},
             {'frame_id': 'map'},
             {'use_sim_time': use_sim_time}
@@ -78,7 +83,7 @@ def generate_launch_description():
         name='map_server',
         output='screen',
         parameters=[
-            {'yaml_filename': [map_config_dir, '/', map_file]},
+            {'yaml_filename': map_yaml_file},
             {'topic_name': 'map'},
             {'frame_id': 'robot_map'},
             {'use_sim_time': use_sim_time}
@@ -104,9 +109,24 @@ def generate_launch_description():
         output='screen',
         parameters=[amcl_config_real]
     )
-    
-    # Lifecycle Manager
-    lifecycle_manager_node = Node(
+
+    # Lifecycle Manager for simulation
+    lifecycle_manager_node_sim = Node(
+        condition=IfCondition(use_sim_time),
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_localization',
+        output='screen',
+        parameters=[
+            {'use_sim_time': use_sim_time},
+            {'autostart': True},
+            {'node_names': ['map_server', 'amcl']}
+        ]
+    )
+
+    # Lifecycle manager for real robot
+    lifecycle_manager_node_real = Node(
+        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
         name='lifecycle_manager_localization',
@@ -138,6 +158,19 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
         output='screen'
     )
+
+    # Add a delay to ensure the map server is fully active before RViz starts
+    delayed_rviz_sim = TimerAction(
+        period=2.0,
+        actions=[rviz_node_sim],
+        condition=IfCondition(use_sim_time)
+    )
+    
+    delayed_rviz_real = TimerAction(
+        period=2.0,
+        actions=[rviz_node_real],
+        condition=IfCondition(PythonExpression(['not ', use_sim_time]))
+    )
     
     # Create and return launch description
     return LaunchDescription([
@@ -147,7 +180,8 @@ def generate_launch_description():
         map_server_node_real,
         amcl_node_sim,
         amcl_node_real,
-        lifecycle_manager_node,
-        rviz_node_sim,
-        rviz_node_real
+        lifecycle_manager_node_sim,
+        lifecycle_manager_node_real,
+        delayed_rviz_sim,
+        delayed_rviz_real
     ])
