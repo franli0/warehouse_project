@@ -15,6 +15,6 @@ recoveries_server:
     robot_base_frame: robot_base_footprint
     transform_timeout: 0.1
     simulate_ahead_time: 2.0
-    max_rotational_vel: 0.7  # Reduced for real robot
-    min_rotational_vel: 0.3  # Reduced for real robot
-    rotational_acc_lim: 2.0  # Reduced for real robot
+    max_rotational_vel: 0.7
+    min_rotational_vel: 0.3
+    rotational_acc_lim: 2.0
