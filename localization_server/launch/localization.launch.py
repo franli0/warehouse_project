@@ -1,12 +1,9 @@
 import os
-import tempfile
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
-from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -21,167 +18,126 @@ def generate_launch_description():
         description='Name of the map YAML file to load'
     )
     
-    # Declare use_sim_time parameter
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    use_sim_time_arg = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='True',
-        description='Use simulation clock if true'
-    )
-    
-    # Configuration file paths
+    # Configuration paths
     map_server_config_dir = get_package_share_directory('map_server')
     map_config_dir = os.path.join(map_server_config_dir, 'config')
     config_dir = os.path.join(pkg_dir, 'config')
-
-    map_yaml_file = PathJoinSubstitution(
-        [FindPackageShare('map_server'), 'config', map_file]
-    )
     
     # RViz configuration
     rviz_config = os.path.join(pkg_dir, 'rviz', 'localization.rviz')
-
-    with open(rviz_config, 'r') as f:
-        template_content = f.read()
-
-    # Create simulation config
-    sim_rviz_content = template_content.replace('{fixed_frame}', 'map')
-    sim_rviz_path = os.path.join(tempfile.gettempdir(), 'localization_sim.rviz')
-    with open(sim_rviz_path, 'w') as f:
-        f.write(sim_rviz_content)
     
-    # Create real robot config
-    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map')
-    real_rviz_path = os.path.join(tempfile.gettempdir(), 'localization_real.rviz')
-    with open(real_rviz_path, 'w') as f:
-        f.write(real_rviz_content)
-    
-    # Load AMCL configuration files
-    amcl_config_sim = os.path.join(config_dir, 'amcl_config_sim.yaml')
-    amcl_config_real = os.path.join(config_dir, 'amcl_config_real.yaml')
-    
-    # Map Server Node - For Simulation
-    map_server_node_sim = Node(
-        condition=IfCondition(use_sim_time),
-        package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        output='screen',
-        parameters=[
-            {'yaml_filename': map_yaml_file},
-            {'topic_name': 'map'},
-            {'frame_id': 'map'},
-            {'use_sim_time': use_sim_time}
+    def launch_setup(context):
+        # Get actual map file value
+        map_file_value = LaunchConfiguration('map_file').perform(context)
+        
+        # Explicitly check for simulation or real robot based on map file name
+        is_simulation = 'sim' in map_file_value.lower()
+        
+        # Set appropriate frames and parameters based on mode
+        if is_simulation:
+            # SIMULATION MODE
+            map_frame = "map"
+            odom_frame = "odom"
+            base_frame = "robot_base_footprint"
+            use_sim_time = True
+            print("\n=== SIMULATION MODE ===")
+            print(f"Map File: {map_file_value}")
+            print(f"Fixed Frame: {map_frame}\n")
+        else:
+            # REAL ROBOT MODE
+            map_frame = "robot_map"
+            odom_frame = "robot_odom"
+            base_frame = "robot_base_footprint"
+            use_sim_time = False
+            print("\n=== REAL ROBOT MODE ===")
+            print(f"Map File: {map_file_value}")
+            print(f"Fixed Frame: {map_frame}\n")
+        
+        # Create RViz config with correct fixed frame
+        with open(rviz_config, 'r') as f:
+            rviz_content = f.read()
+        
+        # Replace the placeholder with the correct frame
+        rviz_content_modified = rviz_content.replace('{fixed_frame}', map_frame)
+        
+        # Write to a unique temp file
+        temp_rviz_path = f'/tmp/localization_{map_frame}.rviz'
+        with open(temp_rviz_path, 'w') as f:
+            f.write(rviz_content_modified)
+        
+        # Full path to map file
+        map_yaml_file = os.path.join(map_config_dir, map_file_value)
+        
+        # Map Server Node
+        map_server_node = Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='map_server',
+            output='screen',
+            parameters=[
+                {'yaml_filename': map_yaml_file},
+                {'topic_name': 'map'},
+                {'frame_id': map_frame},
+                {'use_sim_time': use_sim_time}
+            ]
+        )
+        
+        # AMCL Node
+        amcl_node = Node(
+            package='nav2_amcl',
+            executable='amcl',
+            name='amcl',
+            output='screen',
+            parameters=[
+                {'use_sim_time': use_sim_time},
+                {'global_frame_id': map_frame},
+                {'odom_frame_id': odom_frame},
+                {'base_frame_id': base_frame},
+                {'tf_broadcast': True},
+                {'scan_topic': '/scan'},
+                {'max_particles': 8000},
+                {'set_initial_pose': True},
+                {'initial_pose.x': 0.0},
+                {'initial_pose.y': 0.0},
+                {'initial_pose.z': 0.0},
+                {'initial_pose.yaw': 0.0},
+                {'transform_tolerance': 1.0},
+                {'publish_particles': True},
+            ]
+        )
+        
+        # Lifecycle Manager
+        lifecycle_manager_node = Node(
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager_localization',
+            output='screen',
+            parameters=[
+                {'use_sim_time': use_sim_time},
+                {'autostart': True},
+                {'node_names': ['map_server', 'amcl']}
+            ]
+        )
+        
+        # RViz node with explicit frame setting
+        rviz_node = Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', temp_rviz_path, '--fixed-frame', map_frame],
+            parameters=[{'use_sim_time': use_sim_time}],
+            output='screen'
+        )
+        
+        return [
+            map_server_node,
+            amcl_node,
+            lifecycle_manager_node,
+            rviz_node
         ]
-    )
-
-    # Map Server Node - For Real Robot
-    map_server_node_real = Node(
-        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
-        package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        output='screen',
-        parameters=[
-            {'yaml_filename': map_yaml_file},
-            {'topic_name': 'map'},
-            {'frame_id': 'robot_map'},
-            {'use_sim_time': use_sim_time}
-        ]
-    )
-    
-    # AMCL Node for simulation environment
-    amcl_node_sim = Node(
-        condition=IfCondition(use_sim_time),
-        package='nav2_amcl',
-        executable='amcl',
-        name='amcl',
-        output='screen',
-        parameters=[amcl_config_sim]
-    )
-    
-    # AMCL Node for real environment
-    amcl_node_real = Node(
-        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
-        package='nav2_amcl',
-        executable='amcl',
-        name='amcl',
-        output='screen',
-        parameters=[amcl_config_real]
-    )
-
-    # Lifecycle Manager for simulation
-    lifecycle_manager_node_sim = Node(
-        condition=IfCondition(use_sim_time),
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_localization',
-        output='screen',
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            {'autostart': True},
-            {'node_names': ['map_server', 'amcl']}
-        ]
-    )
-
-    # Lifecycle manager for real robot
-    lifecycle_manager_node_real = Node(
-        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_localization',
-        output='screen',
-        parameters=[
-            {'use_sim_time': use_sim_time},
-            {'autostart': True},
-            {'node_names': ['map_server', 'amcl']}
-        ]
-    )
-    
-    # RViz node with different fixed frame based on environment
-    rviz_node_sim = Node(
-        condition=IfCondition(use_sim_time),
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        arguments=['-d', sim_rviz_path],
-        parameters=[{'use_sim_time': use_sim_time}],
-        output='screen'
-    )
-    
-    rviz_node_real = Node(
-        condition=IfCondition(PythonExpression(['not ', use_sim_time])),
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        arguments=['-d', real_rviz_path],
-        parameters=[{'use_sim_time': use_sim_time}],
-        output='screen'
-    )
-
-    # Add a delay to ensure the map server is fully active before RViz starts
-    delayed_rviz_sim = TimerAction(
-        period=2.0,
-        actions=[rviz_node_sim],
-        condition=IfCondition(use_sim_time)
-    )
-    
-    delayed_rviz_real = TimerAction(
-        period=2.0,
-        actions=[rviz_node_real],
-        condition=IfCondition(PythonExpression(['not ', use_sim_time]))
-    )
     
     # Create and return launch description
     return LaunchDescription([
         map_file_arg,
-        use_sim_time_arg,
-        map_server_node_sim,
-        map_server_node_real,
-        amcl_node_sim,
-        amcl_node_real,
-        lifecycle_manager_node_sim,
-        lifecycle_manager_node_real,
-        delayed_rviz_sim,
-        delayed_rviz_real
+        OpaqueFunction(function=launch_setup)
     ])
