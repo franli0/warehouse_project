@@ -39,6 +39,7 @@ def generate_launch_description():
             controller_config = os.path.join(config_dir, 'controller_sim.yaml')
             planner_config = os.path.join(config_dir, 'planner_sim.yaml')
             recoveries_config = os.path.join(config_dir, 'recoveries_sim.yaml')
+            filters_config = os.path.join(config_dir, 'filters_sim.yaml')
             fixed_frame = 'map'
             print("\n=== SIMULATION MODE ===")
             print(f"Command velocity topic: {cmd_vel_topic}")
@@ -49,6 +50,7 @@ def generate_launch_description():
             controller_config = os.path.join(config_dir, 'controller_real.yaml')
             planner_config = os.path.join(config_dir, 'planner_real.yaml')
             recoveries_config = os.path.join(config_dir, 'recoveries_real.yaml')
+            filters_config = os.path.join(config_dir, 'filters_real.yaml')
             fixed_frame = 'robot_map'
             print("\n=== REAL ROBOT MODE ===")
             print(f"Command velocity topic: {cmd_vel_topic}")
@@ -128,6 +130,32 @@ def generate_launch_description():
             ]
         )
 
+        # Filter Mask Server
+        filter_mask_server = Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='filter_mask_server',
+            output='screen',
+            emulate_tty=True,
+            parameters=[
+                filters_config,
+                {'use_sim_time': is_simulation}
+            ]
+        )
+
+        # Costmap Filter Info Server
+        costmap_filter_info_server = Node(
+            package='nav2_map_server',
+            executable='costmap_filter_info_server',
+            name='costmap_filter_info_server',
+            output='screen',
+            emulate_tty=True,
+            parameters=[
+                filters_config,
+                {'use_sim_time': is_simulation}
+            ]
+        )
+
         # Lifecycle Manager
         lifecycle_manager_node = Node(
             package='nav2_lifecycle_manager',
@@ -141,10 +169,14 @@ def generate_launch_description():
                     'planner_server',
                     'controller_server',
                     'recoveries_server',
-                    'bt_navigator'
+                    'bt_navigator',
+                    'filter_mask_server',
+                    'costmap_filter_info_server'
                 ]}
             ]
         )
+
+        
 
         # RViz node
         rviz_node = Node(
