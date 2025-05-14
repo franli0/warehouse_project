@@ -194,6 +194,8 @@ def generate_launch_description():
             planner_server_node,
             controller_server_node,
             recoveries_server_node,
+            filter_mask_server,
+            costmap_filter_info_server,
             lifecycle_manager_node,
             rviz_node,
         ]
