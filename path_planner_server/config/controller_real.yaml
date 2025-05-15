@@ -48,6 +48,7 @@ controller_server:
       rotate_to_heading_min_angle: 0.785
       allow_reversing: false
       reversing_fall_off_distance: 0.5
+      publish_local_plan: true
 
 local_costmap:
   local_costmap:

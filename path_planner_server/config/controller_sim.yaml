@@ -65,6 +65,7 @@ controller_server:
       RotateToGoal.lookahead_time: -1.0
       goal_dist_bias: 5.0
       path_dist_bias: 5.0
+      publish_local_plan: true
 
 local_costmap:
   local_costmap:
