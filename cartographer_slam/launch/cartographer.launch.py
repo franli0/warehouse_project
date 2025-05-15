@@ -30,13 +30,13 @@ def generate_launch_description():
         template_content = f.read()
     
     # Create simulation config
-    sim_rviz_content = template_content.replace('{fixed_frame}', 'map')
+    sim_rviz_content = template_content.replace('{fixed_frame}', 'map').replace('{view_angle}', '0.0')
     sim_rviz_path = os.path.join(tempfile.gettempdir(), 'mapping_sim.rviz')
     with open(sim_rviz_path, 'w') as f:
         f.write(sim_rviz_content)
     
     # Create real robot config
-    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map')
+    real_rviz_content = template_content.replace('{fixed_frame}', 'robot_map').replace('{view_angle}', '1.5708')
     real_rviz_path = os.path.join(tempfile.gettempdir(), 'mapping_real.rviz')
     with open(real_rviz_path, 'w') as f:
         f.write(real_rviz_content)

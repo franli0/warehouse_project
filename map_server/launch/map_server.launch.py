@@ -38,12 +38,14 @@ def generate_launch_description():
         if is_simulation:
             frame_id = 'map'
             fixed_frame = 'map'
+            view_angle = '0.0'
             print("\n=== SIMULATION MODE ===")
             print(f"Map File: {map_file_value}")
             print(f"Fixed Frame: {frame_id}\n")
         else:
             frame_id = 'robot_map'
             fixed_frame = 'robot_map'
+            view_angle = '1.5708'
             print("\n=== REAL ROBOT MODE ===")
             print(f"Map File: {map_file_value}")
             print(f"Fixed Frame: {frame_id}\n")
@@ -52,7 +54,7 @@ def generate_launch_description():
         with open(rviz_config, 'r') as f:
             rviz_content = f.read()
         
-        rviz_content_modified = rviz_content.replace('{fixed_frame}', fixed_frame)
+        rviz_content_modified = rviz_content.replace('{fixed_frame}', fixed_frame).replace('{view_angle}', view_angle)
         temp_rviz_path = f'/tmp/map_display_{fixed_frame}.rviz'
         with open(temp_rviz_path, 'w') as f:
             f.write(rviz_content_modified)

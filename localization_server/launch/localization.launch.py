@@ -39,6 +39,7 @@ def generate_launch_description():
             map_frame = "map"
             odom_frame = "odom"
             base_frame = "robot_base_footprint"
+            view_angle = '0.0'
             use_sim_time = True
             print("\n=== SIMULATION MODE ===")
             print(f"Map File: {map_file_value}")
@@ -48,6 +49,7 @@ def generate_launch_description():
             map_frame = "robot_map"
             odom_frame = "robot_odom"
             base_frame = "robot_base_footprint"
+            view_angle = '1.5708'
             use_sim_time = False
             print("\n=== REAL ROBOT MODE ===")
             print(f"Map File: {map_file_value}")
@@ -58,7 +60,7 @@ def generate_launch_description():
             rviz_content = f.read()
         
         # Replace the placeholder with the correct frame
-        rviz_content_modified = rviz_content.replace('{fixed_frame}', map_frame)
+        rviz_content_modified = rviz_content.replace('{fixed_frame}', map_frame).replace('{view_angle}', view_angle)
         
         # Write to a unique temp file
         temp_rviz_path = f'/tmp/localization_{map_frame}.rviz'
