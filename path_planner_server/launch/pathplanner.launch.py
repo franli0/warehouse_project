@@ -41,6 +41,7 @@ def generate_launch_description():
             recoveries_config = os.path.join(config_dir, 'recoveries_sim.yaml')
             filters_config = os.path.join(config_dir, 'filters_sim.yaml')
             fixed_frame = 'map'
+            view_angle = '0.0'
             print("\n=== SIMULATION MODE ===")
             print(f"Command velocity topic: {cmd_vel_topic}")
             print(f"Fixed frame: {fixed_frame}\n")
@@ -52,6 +53,7 @@ def generate_launch_description():
             recoveries_config = os.path.join(config_dir, 'recoveries_real.yaml')
             filters_config = os.path.join(config_dir, 'filters_real.yaml')
             fixed_frame = 'robot_map'
+            view_angle = '1.5708'
             print("\n=== REAL ROBOT MODE ===")
             print(f"Command velocity topic: {cmd_vel_topic}")
             print(f"Fixed frame: {fixed_frame}\n")
@@ -60,7 +62,7 @@ def generate_launch_description():
         with open(rviz_config, 'r') as f:
             rviz_content = f.read()
         
-        rviz_content_modified = rviz_content.replace('{fixed_frame}', fixed_frame)
+        rviz_content_modified = rviz_content.replace('{fixed_frame}', fixed_frame).replace('{view_angle}', view_angle)
         temp_rviz_path = f'/tmp/pathplanning_{fixed_frame}.rviz'
         with open(temp_rviz_path, 'w') as f:
             f.write(rviz_content_modified)
